@@ -6,7 +6,7 @@ pages_build_output_dir = ".output"
 [[d1_databases]]
 binding = "DB"
 database_name = "mini-bank"
-database_id = "your-database-id-here"
+database_id = "your-d1-database-id"
 
 [[r2_buckets]]
 binding = "REPORTS"
@@ -14,3 +14,12 @@ bucket_name = "mini-bank-reports"
 
 [vars]
 APP_NAME = "Mini Bank"
+GOOGLE_CLIENT_ID = ""
+GOOGLE_CLIENT_SECRET = ""
+NEXTAUTH_SECRET = ""
+NEXTAUTH_URL = "https://mini-bank.pages.dev"
+
+[secrets]
+GOOGLE_CLIENT_ID
+GOOGLE_CLIENT_SECRET
+NEXTAUTH_SECRET

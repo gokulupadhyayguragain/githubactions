@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
+const withCloudflare = require('@cloudflare/next-on-pages');
+
 const nextConfig = {
-  output: 'standalone',
   images: {
     unoptimized: true,
   },
@@ -10,8 +11,6 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  // Exclude auth routes from static export
-  pageExtensions: ['ts', 'tsx', 'js', 'jsx', 'mdx'],
 };
 
-module.exports = nextConfig;
+module.exports = withCloudflare(nextConfig);

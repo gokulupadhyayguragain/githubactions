@@ -28,6 +28,10 @@ jobs:
       - name: Build Next.js
         run: npm run build
         env:
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+          NEXTAUTH_URL: https://mini-bank.pages.dev
           NEXT_RUNTIME: nodejs
 
       - name: Deploy to Cloudflare Pages
@@ -36,7 +40,10 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           projectName: mini-bank
-          directory: out
+          directory: .output
+          wranglerConfigPath: wrangler.toml
+          vars: |
+            {"GOOGLE_CLIENT_ID":"${{ secrets.GOOGLE_CLIENT_ID }}","GOOGLE_CLIENT_SECRET":"${{ secrets.GOOGLE_CLIENT_SECRET }}","NEXTAUTH_SECRET":"${{ secrets.NEXTAUTH_SECRET }}","NEXTAUTH_URL":"https://mini-bank.pages.dev"}
 
       - name: Comment Deployment URL
         if: github.event_name == 'push'
