@@ -38,10 +38,9 @@ jobs:
           mkdir -p functions
           cp -r .next/server/functions/* functions/api/
 
-      - name: Deploy to Cloudflare Pages
+      - name: Deploy to Cloudflare Workers
         run: |
-          npx wrangler pages project create mini-bank --production-branch=main 2>/dev/null || true
-          npx wrangler pages deploy . --project-name=mini-bank --skip-caching --no-bundle
+          npx wrangler deploy --name=mini-bank-worker --env=production
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

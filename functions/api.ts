@@ -2,16 +2,16 @@ import { D1Database } from '@cloudflare/workers-types';
 
 interface Env {
   DB: D1Database;
-  NEXTAUTH_URL?: string;
 }
 
-async function handleAPI(path: string, request: Request, env: Env): Promise<Response> {
+// Handle API routes
+export async function handleRequest(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
-  const method = request.method;
+  const path = url.pathname;
 
   // /api/accounts
   if (path === '/api/accounts') {
-    if (method === 'GET') {
+    if (request.method === 'GET') {
       const email = url.searchParams.get('email');
       if (!email) {
         return new Response(JSON.stringify({ error: 'Email is required' }), { 
@@ -29,7 +29,7 @@ async function handleAPI(path: string, request: Request, env: Env): Promise<Resp
       });
     }
 
-    if (method === 'POST') {
+    if (request.method === 'POST') {
       const userId = request.headers.get('x-user-id');
       const email = request.headers.get('x-user-email');
       const name = request.headers.get('x-user-name');
@@ -75,7 +75,7 @@ async function handleAPI(path: string, request: Request, env: Env): Promise<Resp
 
   // /api/transfer
   if (path === '/api/transfer') {
-    if (method === 'POST') {
+    if (request.method === 'POST') {
       const { fromEmail, toEmail, amount } = await request.json();
 
       if (!fromEmail || !toEmail || !amount) {
@@ -147,7 +147,7 @@ async function handleAPI(path: string, request: Request, env: Env): Promise<Resp
 
   // /api/transactions
   if (path === '/api/transactions') {
-    if (method === 'GET') {
+    if (request.method === 'GET') {
       const email = url.searchParams.get('email');
       const limit = parseInt(url.searchParams.get('limit') || '50');
 
@@ -173,7 +173,7 @@ async function handleAPI(path: string, request: Request, env: Env): Promise<Resp
 
   // /api/requests
   if (path === '/api/requests') {
-    if (method === 'POST') {
+    if (request.method === 'POST') {
       const { fromEmail, toEmail, amount, message } = await request.json();
 
       if (!fromEmail || !toEmail || !amount) {
@@ -197,7 +197,7 @@ async function handleAPI(path: string, request: Request, env: Env): Promise<Resp
 
   // /api/report
   if (path === '/api/report') {
-    if (method === 'GET') {
+    if (request.method === 'GET') {
       const reports = await env.DB.prepare('SELECT * FROM reports ORDER BY created_at DESC LIMIT 100').all();
       return new Response(JSON.stringify({ reports: reports.results }), { 
         headers: { 'Content-Type': 'application/json' }
@@ -207,7 +207,7 @@ async function handleAPI(path: string, request: Request, env: Env): Promise<Resp
 
   // /api/admin/report
   if (path === '/api/admin/report') {
-    if (method === 'POST') {
+    if (request.method === 'POST') {
       const { email } = await request.json();
       const transactions = await env.DB.prepare(`
         SELECT * FROM transactions 
@@ -235,18 +235,3 @@ async function handleAPI(path: string, request: Request, env: Env): Promise<Resp
 
   return new Response(JSON.stringify({ error: 'Not found' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
 }
-
-export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
-    const url = new URL(request.url);
-    const path = url.pathname;
-
-    // Check if this is an API route
-    if (path.startsWith('/api/')) {
-      return handleAPI(path, request, env);
-    }
-
-    // For non-API routes, serve the static Next.js app
-    return fetch(request);
-  },
-};
