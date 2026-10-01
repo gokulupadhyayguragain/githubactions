@@ -41,7 +41,7 @@ jobs:
       - name: Deploy to Cloudflare Pages
         run: |
           npx wrangler pages project create mini-bank --production-branch=main 2>/dev/null || true
-          npx wrangler pages deploy . --project-name=mini-bank --skip-caching
+          npx wrangler pages deploy . --project-name=mini-bank --skip-caching --no-bundle
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
