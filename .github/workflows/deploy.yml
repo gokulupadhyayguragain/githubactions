@@ -30,6 +30,9 @@ jobs:
       - name: Build Next.js
         run: npm run build
 
+      - name: Remove cache
+        run: rm -rf .next/cache
+
       - name: Deploy to Cloudflare Pages
         run: |
           npx wrangler pages project create mini-bank --production-branch=main 2>/dev/null || true
