@@ -20,11 +20,3 @@ NEXTAUTH_URL = "https://mini-bank.pages.dev"
 
 [build]
 command = "npm run build"
-pages_build_output_dir = ".next"
-
-[[pages.functions]]
-src = "functions/*"
-name = "functions"
-
-# For Workers deployment
-main = "_worker.js"
