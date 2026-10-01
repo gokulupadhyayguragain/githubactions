@@ -24,7 +24,7 @@ export async function POST(request: Request, env: Env) {
     }
 
     // Start transaction
-    const fromAccount = await env.DB.prepare('SELECT * FROM accounts WHERE email = ? FOR UPDATE')
+    const fromAccount = await env.DB.prepare('SELECT * FROM accounts WHERE email = ?')
       .bind(fromEmail)
       .first();
 
@@ -76,6 +76,7 @@ export async function POST(request: Request, env: Env) {
       headers: { 'Content-Type': 'application/json' }
     });
   } catch (error) {
+    console.error('POST transfer error:', error);
     return new Response(JSON.stringify({ error: 'Transfer failed' }), { 
       status: 500,
       headers: { 'Content-Type': 'application/json' }

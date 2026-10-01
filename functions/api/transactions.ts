@@ -28,6 +28,7 @@ export async function GET(request: Request, env: Env) {
       headers: { 'Content-Type': 'application/json' }
     });
   } catch (error) {
+    console.error('GET transactions error:', error);
     return new Response(JSON.stringify({ error: 'Failed to fetch transactions' }), { 
       status: 500,
       headers: { 'Content-Type': 'application/json' }
@@ -56,6 +57,7 @@ export async function POST(request: Request, env: Env) {
       headers: { 'Content-Type': 'application/json' }
     });
   } catch (error) {
+    console.error('POST transactions error:', error);
     return new Response(JSON.stringify({ error: 'Failed to create transaction' }), { 
       status: 500,
       headers: { 'Content-Type': 'application/json' }

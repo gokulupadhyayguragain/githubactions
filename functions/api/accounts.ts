@@ -2,7 +2,7 @@ import { D1Database } from '@cloudflare/workers-types';
 
 interface Env {
   DB: D1Database;
-  NEXT_PUBLIC_GOOGLE_CLIENT_ID: string;
+  NEXT_PUBLIC_GOOGLE_CLIENT_ID?: string;
 }
 
 export async function GET(request: Request, env: Env) {
@@ -25,6 +25,7 @@ export async function GET(request: Request, env: Env) {
       headers: { 'Content-Type': 'application/json' }
     });
   } catch (error) {
+    console.error('GET accounts error:', error);
     return new Response(JSON.stringify({ error: 'Database error' }), { 
       status: 500,
       headers: { 'Content-Type': 'application/json' }
@@ -34,7 +35,6 @@ export async function GET(request: Request, env: Env) {
 
 export async function POST(request: Request, env: Env) {
   try {
-    const body = await request.json();
     const userId = request.headers.get('x-user-id');
     const email = request.headers.get('x-user-email');
     const name = request.headers.get('x-user-name');
@@ -76,6 +76,7 @@ export async function POST(request: Request, env: Env) {
       headers: { 'Content-Type': 'application/json' }
     });
   } catch (error) {
+    console.error('POST accounts error:', error);
     return new Response(JSON.stringify({ error: 'Failed to create account' }), { 
       status: 500,
       headers: { 'Content-Type': 'application/json' }

@@ -31,6 +31,7 @@ export async function POST(request: Request, env: Env) {
       headers: { 'Content-Type': 'application/json' }
     });
   } catch (error) {
+    console.error('POST admin/report error:', error);
     return new Response(JSON.stringify({ error: 'Failed to generate report' }), { 
       status: 500,
       headers: { 'Content-Type': 'application/json' }

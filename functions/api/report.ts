@@ -12,6 +12,7 @@ export async function GET(request: Request, env: Env) {
       headers: { 'Content-Type': 'application/json' }
     });
   } catch (error) {
+    console.error('GET report error:', error);
     return new Response(JSON.stringify({ error: 'Failed to fetch reports' }), { 
       status: 500,
       headers: { 'Content-Type': 'application/json' }

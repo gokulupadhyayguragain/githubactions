@@ -25,6 +25,7 @@ export async function POST(request: Request, env: Env) {
       headers: { 'Content-Type': 'application/json' }
     });
   } catch (error) {
+    console.error('POST requests error:', error);
     return new Response(JSON.stringify({ error: 'Failed to create request' }), { 
       status: 500,
       headers: { 'Content-Type': 'application/json' }
