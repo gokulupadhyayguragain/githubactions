@@ -1,7 +1,6 @@
 /** @type {import('next').NextConfig} */
-const withCloudflare = require('@cloudflare/next-on-pages');
-
 const nextConfig = {
+  output: 'export',
   images: {
     unoptimized: true,
   },
@@ -13,4 +12,4 @@ const nextConfig = {
   },
 };
 
-module.exports = withCloudflare(nextConfig);
+module.exports = nextConfig;
