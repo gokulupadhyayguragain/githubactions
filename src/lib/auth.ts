@@ -1,11 +1,15 @@
 import { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 
+// Google OAuth credentials from googlesso.json
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "932167395499-d60lnr2s9vdq4csvvj4fdkiatir52rvo";
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || "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";
+
 export const authOptions: NextAuthOptions = {
   providers: [
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      clientId: GOOGLE_CLIENT_ID,
+      clientSecret: GOOGLE_CLIENT_SECRET,
     }),
   ],
   callbacks: {
@@ -36,5 +40,5 @@ export const authOptions: NextAuthOptions = {
     strategy: "jwt",
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
-  secret: process.env.NEXTAUTH_SECRET,
+  secret: process.env.NEXTAUTH_SECRET || "mini-bank-secret-key-change-in-production",
 };
