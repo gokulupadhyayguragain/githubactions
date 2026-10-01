@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 
+// Static export for Cloudflare Pages
+export const dynamic = 'force-static';
+
 // Admin report endpoint - returns overall bank statistics
 export async function GET(request: NextRequest) {
   try {
