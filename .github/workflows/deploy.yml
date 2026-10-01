@@ -31,9 +31,11 @@ jobs:
         run: npm run build
 
       - name: Deploy to Cloudflare Pages
-        run: |
-          npx wrangler pages project create mini-bank --production-branch=main 2>/dev/null || true
-          npx wrangler pages deploy .next/server/app --project-name=mini-bank --branch=main
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: mini-bank
+          directory: .next
+          buildCommand: npm run build
+          wranglerVersion: '3'
