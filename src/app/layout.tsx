@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { AuthProvider } from '@/components/AuthProvider';
 
 export const metadata: Metadata = {
   title: 'Mini Bank - Push. Deploy. Automate.',
@@ -14,9 +15,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="bg-pattern min-h-screen">
-        <div className="min-h-screen">
-          {children}
-        </div>
+        <AuthProvider>
+          <div className="min-h-screen">
+            {children}
+          </div>
+        </AuthProvider>
       </body>
     </html>
   );

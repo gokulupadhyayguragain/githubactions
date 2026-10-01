@@ -47,3 +47,6 @@ report.*
 
 # Logs
 *.log
+
+# OAuth credentials
+googlesso.json

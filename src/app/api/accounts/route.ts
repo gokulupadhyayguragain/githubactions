@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, generateId } from '@/lib/db';
 
-interface CreateAccountRequest {
-  name: string;
-  email: string;
+// Generate 5-digit hex account number (00000-FFFFF)
+function generateHexAccountNumber(): string {
+  return Math.floor(Math.random() * 0xFFFFF).toString(16).toUpperCase().padStart(5, '0');
 }
 
 export async function GET(request: NextRequest) {
@@ -16,13 +16,17 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get account from header
+    const { searchParams } = new URL(request.url);
+    const email = searchParams.get('email');
+    const all = searchParams.get('all') === 'true';
+
+    // Get account from header (authenticated user)
     const accountNumber = request.headers.get('x-account-number');
     
-    if (accountNumber) {
+    if (accountNumber && !all) {
       // Return single account
       const account = await db.prepare(
-        'SELECT * FROM accounts WHERE account_number = ?'
+        'SELECT * FROM accounts WHERE account_number = ? AND is_active = 1'
       ).bind(accountNumber).first();
 
       if (!account) {
@@ -32,13 +36,24 @@ export async function GET(request: NextRequest) {
         );
       }
 
-      return NextResponse.json({ account });
+      // Get user info
+      const user = await db.prepare(
+        'SELECT name, email, image FROM users WHERE id = ?'
+      ).bind(account.user_id).first();
+
+      return NextResponse.json({ 
+        account: { ...account, ...user } 
+      });
     }
 
-    // Return all accounts
-    const accounts = await db.prepare(
-      'SELECT * FROM accounts ORDER BY created_at DESC'
-    ).all();
+    // Return all accounts (admin only)
+    const accounts = await db.prepare(`
+      SELECT a.*, u.name, u.email, u.image 
+      FROM accounts a 
+      JOIN users u ON a.user_id = u.id 
+      WHERE a.is_active = 1
+      ORDER BY a.created_at DESC
+    `).all();
 
     return NextResponse.json({ accounts: accounts.results || [] });
   } catch (error) {
@@ -52,13 +67,15 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body: CreateAccountRequest = await request.json();
-    const { name, email } = body;
+    // Get user from header (authenticated)
+    const userId = request.headers.get('x-user-id');
+    const userEmail = request.headers.get('x-user-email');
+    const userName = request.headers.get('x-user-name');
 
-    if (!name || !email) {
+    if (!userId || !userEmail) {
       return NextResponse.json(
-        { error: 'Name and email are required' },
-        { status: 400 }
+        { error: 'Authentication required' },
+        { status: 401 }
       );
     }
 
@@ -70,15 +87,38 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate account number
-    const accountCount = await db.prepare('SELECT COUNT(*) as count FROM accounts').first() as { count: number };
-    const accountNumber = `GC${String(accountCount.count + 1).padStart(3, '0')}`;
+    // Check if user already has an account
+    const existingAccount = await db.prepare(
+      'SELECT * FROM accounts WHERE user_id = ? AND is_active = 1'
+    ).bind(userId).first();
+
+    if (existingAccount) {
+      return NextResponse.json(
+        { 
+          account: existingAccount,
+          message: 'Account already exists'
+        },
+        { status: 200 }
+      );
+    }
+
+    // Generate unique 5-digit hex account number
+    let accountNumber: string;
+    let attempts = 0;
+    do {
+      accountNumber = generateHexAccountNumber();
+      const existing = await db.prepare(
+        'SELECT id FROM accounts WHERE account_number = ?'
+      ).bind(accountNumber).first();
+      if (!existing) break;
+      attempts++;
+    } while (attempts < 10);
 
     // Create account
     const id = generateId('acc');
     await db.prepare(
-      'INSERT INTO accounts (id, account_number, name, email, role, balance) VALUES (?, ?, ?, ?, ?, ?)'
-    ).bind(id, accountNumber, name, email, 'user', 1000).run();
+      'INSERT INTO accounts (id, user_id, account_number, balance) VALUES (?, ?, ?, ?)'
+    ).bind(id, userId, accountNumber, 1000).run();
 
     const account = await db.prepare(
       'SELECT * FROM accounts WHERE id = ?'
@@ -88,7 +128,8 @@ export async function POST(request: NextRequest) {
       { 
         success: true, 
         message: 'Account created successfully',
-        account 
+        account,
+        startingBalance: 1000
       },
       { status: 201 }
     );
@@ -96,7 +137,7 @@ export async function POST(request: NextRequest) {
     console.error('Create account error:', error);
     if (error.message?.includes('UNIQUE constraint failed')) {
       return NextResponse.json(
-        { error: 'Email already exists' },
+        { error: 'Account already exists' },
         { status: 409 }
       );
     }

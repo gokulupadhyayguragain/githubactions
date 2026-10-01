@@ -1,15 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, generateId } from '@/lib/db';
-
-interface TransferRequest {
-  to: string;
-  amount: number;
-  description?: string;
-}
+import { generateReceiptPDF } from '@/lib/pdf';
 
 export async function POST(request: NextRequest) {
   try {
-    const body: TransferRequest = await request.json();
+    const body = await request.json();
     const { to, amount, description } = body;
 
     // Validate input
@@ -20,8 +15,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get account from header (simulated auth)
+    // Get account from header (authenticated user)
     const accountNumber = request.headers.get('x-account-number');
+    const userId = request.headers.get('x-user-id');
+    
     if (!accountNumber) {
       return NextResponse.json(
         { error: 'Account not identified. Set x-account-number header.' },
@@ -37,14 +34,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if accounts exist
+    // Get sender account
     const fromAccount = await db.prepare(
-      'SELECT * FROM accounts WHERE account_number = ?'
+      'SELECT * FROM accounts WHERE account_number = ? AND is_active = 1'
     ).bind(accountNumber).first();
 
+    // Get recipient account
     const toAccount = await db.prepare(
-      'SELECT * FROM accounts WHERE account_number = ?'
-    ).bind(to).first();
+      'SELECT * FROM accounts WHERE account_number = ? AND is_active = 1'
+    ).bind(to.toUpperCase()).first();
 
     if (!fromAccount) {
       return NextResponse.json(
@@ -60,7 +58,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (accountNumber === to) {
+    if (accountNumber === to.toUpperCase()) {
       return NextResponse.json(
         { error: 'Cannot transfer to your own account' },
         { status: 400 }
@@ -75,31 +73,58 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Perform transfer in a transaction-like manner
-    // Deduct from sender
+    // Get user names
+    const fromUser = await db.prepare(
+      'SELECT name FROM users WHERE id = ?'
+    ).bind(fromAccount.user_id).first();
+    
+    const toUser = await db.prepare(
+      'SELECT name FROM users WHERE id = ?'
+    ).bind(toAccount.user_id).first();
+
+    // Perform transfer
     await db.prepare(
       'UPDATE accounts SET balance = balance - ?, updated_at = datetime("now") WHERE account_number = ?'
     ).bind(amount, accountNumber).run();
 
-    // Add to recipient
     await db.prepare(
       'UPDATE accounts SET balance = balance + ?, updated_at = datetime("now") WHERE account_number = ?'
-    ).bind(amount, to).run();
+    ).bind(amount, to.toUpperCase()).run();
 
     // Record transaction
-    const transactionId = generateId('txn');
+    const transactionId = `TXN${Date.now().toString(36).toUpperCase()}`;
     await db.prepare(
       'INSERT INTO transactions (id, from_account, to_account, amount, description) VALUES (?, ?, ?, ?, ?)'
-    ).bind(transactionId, accountNumber, to, amount, description || null).run();
+    ).bind(transactionId, accountNumber, to.toUpperCase(), amount, description || null).run();
 
     // Get updated balances
     const fromUpdated = await db.prepare(
-      'SELECT * FROM accounts WHERE account_number = ?'
+      'SELECT balance FROM accounts WHERE account_number = ?'
     ).bind(accountNumber).first();
 
-    const toUpdated = await db.prepare(
-      'SELECT * FROM accounts WHERE account_number = ?'
-    ).bind(to).first();
+    // Generate PDF receipt
+    const receiptData = {
+      transaction: {
+        id: transactionId,
+        from_account: accountNumber,
+        to_account: to.toUpperCase(),
+        amount,
+        description: description || null,
+        timestamp: new Date().toISOString(),
+      },
+      fromName: fromUser?.name || 'Unknown',
+      toName: toUser?.name || 'Unknown',
+      fromAccount: accountNumber,
+      toAccount: to.toUpperCase(),
+      balanceAfter: fromUpdated?.balance || 0,
+    };
+
+    const receiptPdf = generateReceiptPDF(receiptData);
+
+    // Update transaction with receipt URL
+    await db.prepare(
+      'UPDATE transactions SET receipt_pdf = ? WHERE id = ?'
+    ).bind(receiptPdf, transactionId).run();
 
     return NextResponse.json({
       success: true,
@@ -107,13 +132,14 @@ export async function POST(request: NextRequest) {
       transaction: {
         id: transactionId,
         from: accountNumber,
-        to: to,
-        amount: amount,
+        to: to.toUpperCase(),
+        amount,
         description: description || null,
         timestamp: new Date().toISOString(),
       },
+      receipt: receiptPdf,
       from_balance: fromUpdated?.balance,
-      to_balance: toUpdated?.balance,
+      to_balance: toAccount.balance + amount,
     });
   } catch (error) {
     console.error('Transfer error:', error);

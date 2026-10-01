@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'export',
+  output: 'standalone',
   images: {
     unoptimized: true,
   },
@@ -10,6 +10,8 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  // Exclude auth routes from static export
+  pageExtensions: ['ts', 'tsx', 'js', 'jsx', 'mdx'],
 };
 
 module.exports = nextConfig;
