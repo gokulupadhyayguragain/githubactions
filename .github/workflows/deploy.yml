@@ -34,10 +34,36 @@ jobs:
           NEXTAUTH_URL: https://mini-bank.pages.dev
           NEXT_RUNTIME: nodejs
 
-      - name: Deploy to Cloudflare Pages
-        uses: cloudflare/cloudflare-pages-action@v1
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          projectName: mini-bank
-          directory: .output
+      - name: Upload to Cloudflare Pages
+        run: |
+          # Get account ID
+          ACCOUNT_ID="${{ secrets.CLOUDFLARE_ACCOUNT_ID }}"
+          API_TOKEN="${{ secrets.CLOUDFLARE_API_TOKEN }}"
+          
+          # Create a new deployment
+          RESPONSE=$(curl -s -X POST \
+            "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/pages/projects/mini-bank/deployments" \
+            -H "Authorization: Bearer ${API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data '{
+              "branch": "main",
+              "meta": {
+                "commit_sha": "${{ github.sha }}",
+                "commit_message": "${{ github.event.head_commit.message }}"
+              },
+              "sources": [
+                {
+                  "type": "upload",
+                  "prefix": "",
+                  "source": ".output"
+                }
+              ]
+            }')
+          
+          echo "Deployment response: $RESPONSE"
+          
+          # Get deployment URL
+          DEPLOYMENT_URL=$(echo $RESPONSE | jq -r '.result.url')
+          echo "DEPLOYMENT_URL=$DEPLOYMENT_URL" >> $GITHUB_ENV
+          
+          echo "🎉 Deployed to: https://mini-bank.pages.dev"
