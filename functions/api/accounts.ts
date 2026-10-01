@@ -1,11 +1,4 @@
-import { D1Database } from '@cloudflare/workers-types';
-
-interface Env {
-  DB: D1Database;
-  NEXT_PUBLIC_GOOGLE_CLIENT_ID?: string;
-}
-
-export async function GET(request: Request, env: Env) {
+export async function GET(request: Request, env: any) {
   const url = new URL(request.url);
   const email = url.searchParams.get('email');
 
@@ -33,7 +26,7 @@ export async function GET(request: Request, env: Env) {
   }
 }
 
-export async function POST(request: Request, env: Env) {
+export async function POST(request: Request, env: any) {
   try {
     const userId = request.headers.get('x-user-id');
     const email = request.headers.get('x-user-email');
