@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, generateId } from '@/lib/db';
 
+// Use edge runtime for Cloudflare Pages
+export const runtime = 'edge';
+
 // Generate 5-digit hex account number (00000-FFFFF)
 function generateHexAccountNumber(): string {
   return Math.floor(Math.random() * 0xFFFFF).toString(16).toUpperCase().padStart(5, '0');
