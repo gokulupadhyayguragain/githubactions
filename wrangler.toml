@@ -1,8 +1,9 @@
 name = "mini-bank"
 compatibility_date = "2024-10-01"
 compatibility_flags = ["nodejs_compat"]
-# For Pages Functions, we deploy the .next directory
-# Functions are auto-detected in .next/server/chunks/
+
+# Pages Functions are auto-detected in the functions/ directory
+# They are served from the same domain as the Pages site
 
 [[d1_databases]]
 binding = "DB"
