@@ -33,10 +33,15 @@ jobs:
       - name: Remove cache
         run: rm -rf .next/cache
 
+      - name: Copy Functions to .next
+        run: |
+          mkdir -p .next/server/functions
+          cp -r functions/api/* .next/server/functions/
+
       - name: Deploy to Cloudflare Pages
         run: |
           npx wrangler pages project create mini-bank --production-branch=main 2>/dev/null || true
-          npx wrangler pages deploy . --project-name=mini-bank --skip-caching
+          npx wrangler pages deploy .next --project-name=mini-bank --skip-caching
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
