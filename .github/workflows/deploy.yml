@@ -36,11 +36,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           projectName: mini-bank
-          directory: .output
-          optionalVars: |
-            [
-              {"key":"APP_URL","value":"${{ secrets.APP_URL }}"}
-            ]
+          directory: out
 
       - name: Comment Deployment URL
         if: github.event_name == 'push'

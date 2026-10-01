@@ -1,10 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'standalone',
+  output: 'export',
   images: {
     unoptimized: true,
   },
-  // For local dev without Cloudflare
   eslint: {
     ignoreDuringBuilds: true,
   },
