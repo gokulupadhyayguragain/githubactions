@@ -27,7 +27,7 @@ const HTML = `<!DOCTYPE html>
 </head>
 <body>
   <div class="container">
-    <h1>📝 My Notes</h1>
+    <h1>My Notes</h1>
     <div class="add-note">
       <textarea id="noteInput" placeholder="Write your note..."></textarea>
       <button onclick="addNote()">Add Note</button>
@@ -36,50 +36,99 @@ const HTML = `<!DOCTYPE html>
   </div>
   <script>
     const API = '/api/notes';
+    
+    function escapeHtml(text) {
+      return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+    
     async function loadNotes() {
       const res = await fetch(API);
       const data = await res.json();
       const list = document.getElementById('notesList');
-      if (!data.notes || data.notes.length === 0) { list.innerHTML = '<div class="empty">No notes yet!</div>'; return; }
-      list.innerHTML = data.notes.map(n => `<div class="note"><div class="note-actions"><button onclick="deleteNote(${n.id})">Delete</button></div><div class="note-content">${n.content.replace(/</g,'&lt;')}</div><div class="note-date">${new Date(n.created_at).toLocaleString()}</div></div>`).join('');
+      if (!data.notes || data.notes.length === 0) {
+        list.innerHTML = '<div class="empty">No notes yet!</div>';
+        return;
+      }
+      let html = '';
+      for (var i = 0; i < data.notes.length; i++) {
+        var n = data.notes[i];
+        html += '<div class="note"><div class="note-actions"><button onclick="deleteNote(' + n.id + ')">Delete</button></div><div class="note-content">' + escapeHtml(n.content) + '</div><div class="note-date">' + new Date(n.created_at).toLocaleString() + '</div></div>';
+      }
+      list.innerHTML = html;
     }
+    
     async function addNote() {
-      const content = document.getElementById('noteInput').value.trim();
+      var content = document.getElementById('noteInput').value.trim();
       if (!content) return;
-      await fetch(API, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({content}) });
+      await fetch(API, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({content: content}) });
       document.getElementById('noteInput').value = '';
       loadNotes();
     }
-    async function deleteNote(id) { if(confirm('Delete?')){ await fetch(API+'/'+id,{method:'DELETE'}); loadNotes(); } }
+    
+    async function deleteNote(id) {
+      if (confirm('Delete?')) {
+        await fetch(API + '/' + id, { method: 'DELETE' });
+        loadNotes();
+      }
+    }
+    
     loadNotes();
   </script>
 </body>
 </html>`;
 
-const API = {
-  async GET(request, env) {
-    const notes = await env.DB.prepare('SELECT * FROM notes ORDER BY created_at DESC LIMIT 100').all();
-    return new Response(JSON.stringify({ notes: notes.results }), { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
-  },
-  async POST(request, env) {
-    const { content } = await request.json();
-    if (!content?.trim()) return new Response(JSON.stringify({error:'Content required'}), { status: 400, headers: {'Content-Type':'application/json'} });
-    await env.DB.prepare('INSERT INTO notes (content) VALUES (?)').bind(content.trim()).run();
-    return new Response(JSON.stringify({success:true}), { status: 201, headers: {'Content-Type':'application/json','Access-Control-Allow-Origin':'*'} });
-  },
-  async DELETE(request, env, id) {
-    await env.DB.prepare('DELETE FROM notes WHERE id = ?').bind(id).run();
-    return new Response(JSON.stringify({success:true}), { headers: {'Content-Type':'application/json','Access-Control-Allow-Origin':'*'} });
-  }
-};
-
 export default {
   async fetch(request, env) {
     const path = new URL(request.url).pathname;
-    if (request.method === 'OPTIONS') return new Response(null, { headers: {'Access-Control-Allow-Origin':'*','Access-Control-Allow-Methods':'GET,POST,DELETE','Access-Control-Allow-Headers':'Content-Type'} });
-    if (path === '/api/notes' && request.method === 'GET') return API.GET(request, env);
-    if (path === '/api/notes' && request.method === 'POST') return API.POST(request, env);
-    if (path.startsWith('/api/notes/') && request.method === 'DELETE') return API.DELETE(request, env, parseInt(path.split('/')[3]));
+    
+    if (request.method === 'OPTIONS') {
+      return new Response(null, {
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET,POST,DELETE',
+          'Access-Control-Allow-Headers': 'Content-Type'
+        }
+      });
+    }
+    
+    // GET /api/notes
+    if (path === '/api/notes' && request.method === 'GET') {
+      try {
+        const notes = await env.DB.prepare('SELECT * FROM notes ORDER BY created_at DESC LIMIT 100').all();
+        return new Response(JSON.stringify({ notes: notes.results }), {
+          headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+        });
+      } catch (e) {
+        return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+      }
+    }
+    
+    // POST /api/notes
+    if (path === '/api/notes' && request.method === 'POST') {
+      try {
+        const { content } = await request.json();
+        if (!content || !content.trim()) {
+          return new Response(JSON.stringify({ error: 'Content required' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+        }
+        await env.DB.prepare('INSERT INTO notes (content) VALUES (?)').bind(content.trim()).run();
+        return new Response(JSON.stringify({ success: true }), { status: 201, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
+      } catch (e) {
+        return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+      }
+    }
+    
+    // DELETE /api/notes/:id
+    if (path.startsWith('/api/notes/') && request.method === 'DELETE') {
+      try {
+        const id = parseInt(path.split('/')[3]);
+        await env.DB.prepare('DELETE FROM notes WHERE id = ?').bind(id).run();
+        return new Response(JSON.stringify({ success: true }), { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
+      } catch (e) {
+        return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+      }
+    }
+    
+    // Serve HTML
     return new Response(HTML, { headers: { 'Content-Type': 'text/html' } });
   }
 };
