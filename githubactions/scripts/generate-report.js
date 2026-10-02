@@ -59,6 +59,10 @@ function transactionsToCSV(transactions, accountEmail) {
 }
 
 async function sendEmail(to, subject, text, csv) {
+  if (!config.resendApiKey || !config.reportEmail) {
+    console.log(`Skipping email to ${to} - Resend not configured`);
+    return;
+  }
   const boundary = '----FormBoundary' + Date.now();
   const body = [`--${boundary}`, 'Content-Type: text/plain; charset=utf-8', '', text, `--${boundary}`, 'Content-Type: text/csv; charset=utf-8', 'Content-Disposition: attachment; filename="report.csv"', '', csv, `--${boundary}--`].join('\r\n');
   
@@ -70,13 +74,23 @@ async function sendEmail(to, subject, text, csv) {
 }
 
 async function main() {
+  if (!config.cloudflareApiToken || !config.cloudflareAccountId || !config.d1DatabaseId) {
+    console.log('Missing Cloudflare config - skipping report generation');
+    return;
+  }
   console.log('Generating reports...');
-  const accounts = await getAllAccounts();
-  for (const acc of accounts) {
-    const txns = await getDailyTransactions(acc.email);
-    const csv = transactionsToCSV(txns, acc.email);
-    await sendEmail(acc.email, `Report - ${new Date().toLocaleDateString()}`, `Hi ${acc.name}, Balance: Rs. ${acc.balance}\n\nTransactions: ${txns.length}`, csv);
-    console.log(`Sent to ${acc.email}`);
+  try {
+    const accounts = await getAllAccounts();
+    console.log(`Found ${accounts.length} accounts`);
+    for (const acc of accounts) {
+      const txns = await getDailyTransactions(acc.email);
+      console.log(`${acc.email}: ${txns.length} transactions`);
+      const csv = transactionsToCSV(txns, acc.email);
+      await sendEmail(acc.email, `Report - ${new Date().toLocaleDateString()}`, `Hi ${acc.name}, Balance: Rs. ${acc.balance}\n\nTransactions: ${txns.length}`, csv);
+      console.log(`Sent to ${acc.email}`);
+    }
+  } catch (e) {
+    console.log('Error:', e.message);
   }
   console.log('Done!');
 }

@@ -1,7 +1,7 @@
 #!/bin/bash
 # Set GitHub Actions secrets from .env file
 
-REPO="gokulupadhyayguragain/mini-bank"
+REPO="gokulupadhyayguragain/githubactions"
 
 # Load .env file (create one with your values)
 if [ -f .env ]; then

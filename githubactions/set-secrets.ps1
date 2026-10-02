@@ -1,6 +1,6 @@
 # Set GitHub Actions secrets from .env file
 
-$REPO = "gokulupadhyayguragain/mini-bank"
+$REPO = "gokulupadhyayguragain/githubactions"
 
 if (-not (Test-Path ".env")) {
     Write-Host "Error: .env file not found!" -ForegroundColor Red

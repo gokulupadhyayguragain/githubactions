@@ -6,4 +6,4 @@ compatibility_flags = ["nodejs_compat"]
 [[d1_databases]]
 binding = "DB"
 database_name = "note-app"
-database_id = "REPLACE_WITH_D1_ID"
+database_id = "3a74e1ba-0e7a-46c7-afe7-7da5f86a73a3"
