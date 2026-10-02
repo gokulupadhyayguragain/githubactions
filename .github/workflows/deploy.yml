@@ -1,0 +1,21 @@
+name: Deploy Note App
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Deploy to Cloudflare
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.USER_CF_TOKEN }}
+          accountId: ${{ secrets.USER_CF_ID }}
+          command: deploy
