@@ -18,4 +18,4 @@ jobs:
         with:
           apiToken: ${{ secrets.USER_CF_TOKEN }}
           accountId: ${{ secrets.USER_CF_ID }}
-          command: deploy
+          command: deploy githubactions/worker.js
