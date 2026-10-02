@@ -10,10 +10,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - run: node scripts/generate-report.js
+      
+      - name: Generate and Send Report
+        run: node scripts/generate-report.js
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.BANK_CF_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.BANK_CF_ID }}
