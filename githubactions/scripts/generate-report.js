@@ -1,5 +1,6 @@
 /**
  * Daily Transaction Report Generator
+ * Sends a summary report to the configured email
  */
 
 const https = require('https');
@@ -44,33 +45,35 @@ async function getAllAccounts() {
   return queryD1('SELECT * FROM accounts WHERE is_active = 1');
 }
 
-async function getDailyTransactions(email) {
-  return queryD1(`SELECT * FROM transactions WHERE (from_email = ? OR to_email = ?) AND created_at >= datetime('now', '-1 day') ORDER BY created_at DESC`, [email, email]);
+async function getDailyTransactions() {
+  return queryD1(`SELECT * FROM transactions WHERE created_at >= datetime('now', '-1 day') ORDER BY created_at DESC`);
 }
 
-function transactionsToCSV(transactions, accountEmail) {
-  if (transactions.length === 0) return 'No transactions';
-  const headers = ['Date', 'Type', 'From', 'To', 'Amount', 'Direction'];
-  const rows = transactions.map(t => {
-    const dir = t.from_email === accountEmail ? 'OUT' : 'IN';
-    return [t.created_at, t.type, t.from_email, t.to_email, dir === 'OUT' ? `-${t.amount}` : `+${t.amount}`, dir].join(',');
-  });
-  return [headers.join(','), ...rows].join('\n');
+function generateCSV(transactions) {
+  if (transactions.length === 0) return 'No transactions today';
+  const headers = ['Date', 'From', 'To', 'Amount', 'Type'];
+  const rows = transactions.map(t => [t.created_at, t.from_email, t.to_email, t.amount, t.type || 'transfer']);
+  return [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
 }
 
-async function sendEmail(to, subject, text, csv) {
+async function sendEmail(text) {
   if (!config.resendApiKey || !config.reportEmail) {
-    console.log(`Skipping email to ${to} - Resend not configured`);
+    console.log('Resend not configured - skipping email');
     return;
   }
-  const boundary = '----FormBoundary' + Date.now();
-  const body = [`--${boundary}`, 'Content-Type: text/plain; charset=utf-8', '', text, `--${boundary}`, 'Content-Type: text/csv; charset=utf-8', 'Content-Disposition: attachment; filename="report.csv"', '', csv, `--${boundary}--`].join('\r\n');
-  
   const res = await makeRequest({
     hostname: 'api.resend.com', path: '/emails', method: 'POST',
-    headers: { 'Authorization': `Bearer ${config.resendApiKey}`, 'Content-Type': `multipart/form-data; boundary=${boundary}` },
-  }, body);
-  if (res.status !== 200) throw new Error('Email failed');
+    headers: { 'Authorization': `Bearer ${config.resendApiKey}`, 'Content-Type': 'application/json' },
+  }, JSON.stringify({
+    from: 'Mini Bank <onboarding@resend.dev>',
+    to: config.reportEmail,
+    subject: `Daily Report - ${new Date().toLocaleDateString()}`,
+    text: text
+  }));
+  if (res.status !== 200) {
+    console.log('Email failed:', res.data);
+    throw new Error('Email failed');
+  }
 }
 
 async function main() {
@@ -81,14 +84,29 @@ async function main() {
   console.log('Generating reports...');
   try {
     const accounts = await getAllAccounts();
-    console.log(`Found ${accounts.length} accounts`);
-    for (const acc of accounts) {
-      const txns = await getDailyTransactions(acc.email);
-      console.log(`${acc.email}: ${txns.length} transactions`);
-      const csv = transactionsToCSV(txns, acc.email);
-      await sendEmail(acc.email, `Report - ${new Date().toLocaleDateString()}`, `Hi ${acc.name}, Balance: Rs. ${acc.balance}\n\nTransactions: ${txns.length}`, csv);
-      console.log(`Sent to ${acc.email}`);
-    }
+    const transactions = await getDailyTransactions();
+    
+    console.log(`Found ${accounts.length} accounts, ${transactions.length} transactions`);
+    
+    const totalBalance = accounts.reduce((sum, acc) => sum + (acc.balance || 0), 0);
+    const report = [
+      `Mini Bank Daily Report - ${new Date().toLocaleDateString()}`,
+      '',
+      `Total Accounts: ${accounts.length}`,
+      `Total Balance: Rs. ${totalBalance}`,
+      `Transactions Today: ${transactions.length}`,
+      '',
+      '--- Accounts ---',
+      ...accounts.map(a => `${a.name} (${a.email}): Rs. ${a.balance}`),
+      '',
+      '--- Today\'s Transactions ---',
+      transactions.length === 0 ? 'No transactions' : transactions.map(t => 
+        `${t.created_at}: ${t.from_email} -> ${t.to_email}: Rs. ${t.amount}`
+      ).join('\n')
+    ].join('\n');
+    
+    await sendEmail(report);
+    console.log('Report sent to:', config.reportEmail);
   } catch (e) {
     console.log('Error:', e.message);
   }
