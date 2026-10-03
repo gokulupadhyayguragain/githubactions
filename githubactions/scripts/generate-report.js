@@ -123,23 +123,7 @@ async function sendEmail(to, pdfBuffer, accountName) {
     return;
   }
   
-  const boundary = '----FormBoundary' + Date.now();
   const pdfBase64 = pdfBuffer.toString('base64');
-  
-  const body = [
-    `--${boundary}`,
-    'Content-Type: text/plain; charset=utf-8',
-    '',
-    `Hi ${accountName}, attached is your daily transaction report from Mini Bank.`,
-    '',
-    `--${boundary}`,
-    'Content-Type: application/pdf',
-    'Content-Transfer-Encoding: base64',
-    `Content-Disposition: attachment; filename="report-${new Date().toISOString().split('T')[0]}.pdf"`,
-    '',
-    pdfBase64,
-    `--${boundary}--`
-  ].join('\r\n');
   
   const res = await makeRequest({
     hostname: 'api.resend.com',
@@ -147,9 +131,20 @@ async function sendEmail(to, pdfBuffer, accountName) {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${config.resendApiKey}`,
-      'Content-Type': `multipart/form-data; boundary=${boundary}`
+      'Content-Type': 'application/json'
     },
-  }, body);
+  }, JSON.stringify({
+    from: 'Mini Bank <onboarding@resend.dev>',
+    to: to,
+    subject: `Daily Report - ${new Date().toLocaleDateString()}`,
+    text: `Hi ${accountName}, attached is your daily transaction report from Mini Bank.`,
+    attachments: [
+      {
+        filename: `report-${new Date().toISOString().split('T')[0]}.pdf`,
+        content: pdfBase64
+      }
+    ]
+  }));
   
   if (res.status !== 200) {
     console.log(`Email failed for ${to}:`, res.data);
