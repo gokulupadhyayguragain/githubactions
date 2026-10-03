@@ -26,3 +26,4 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.BANK_CF_ID }}
           D1_DATABASE_ID: ${{ secrets.BANK_D1_ID }}
           RESEND_API_KEY: ${{ secrets.USER_RESEND_KEY }}
+          REPORT_EMAIL: ${{ secrets.USER_RESEND_EMAIL }}

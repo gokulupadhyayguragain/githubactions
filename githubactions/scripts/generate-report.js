@@ -1,6 +1,6 @@
 /**
  * Daily Transaction Report Generator
- * Sends individual PDF report to each account holder
+ * Sends PDF report to admin email (Resend verified)
  */
 
 const https = require('https');
@@ -11,6 +11,7 @@ const config = {
   cloudflareAccountId: process.env.CLOUDFLARE_ACCOUNT_ID,
   d1DatabaseId: process.env.D1_DATABASE_ID,
   resendApiKey: process.env.RESEND_API_KEY,
+  reportEmail: process.env.REPORT_EMAIL,
 };
 
 function makeRequest(options, body = null) {
@@ -45,14 +46,11 @@ async function getAllAccounts() {
   return queryD1('SELECT * FROM accounts WHERE is_active = 1');
 }
 
-async function getDailyTransactions(email) {
-  return queryD1(
-    `SELECT * FROM transactions WHERE (from_email = ? OR to_email = ?) AND created_at >= datetime('now', '-1 day') ORDER BY created_at DESC`,
-    [email, email]
-  );
+async function getDailyTransactions() {
+  return queryD1(`SELECT * FROM transactions WHERE created_at >= datetime('now', '-1 day') ORDER BY created_at DESC`);
 }
 
-function generatePDF(account, transactions) {
+function generatePDF(accounts, transactions) {
   return new Promise((resolve) => {
     const chunks = [];
     const doc = new PDFDocument({ margin: 50 });
@@ -67,47 +65,53 @@ function generatePDF(account, transactions) {
     doc.fontSize(12).text(`Date: ${new Date().toLocaleDateString()}`, { align: 'center' });
     doc.moveDown(2);
     
-    // Account Info
-    doc.fontSize(12).text(`Name: ${account.name}`);
-    doc.text(`Email: ${account.email}`);
-    doc.text(`Current Balance: Rs. ${account.balance || 0}`);
+    // Summary
+    const totalBalance = accounts.reduce((sum, acc) => sum + (acc.balance || 0), 0);
+    doc.fontSize(14).text('Summary', { underline: true });
+    doc.fontSize(12);
+    doc.text(`Total Accounts: ${accounts.length}`);
+    doc.text(`Total Balance: Rs. ${totalBalance}`);
+    doc.text(`Transactions Today: ${transactions.length}`);
+    doc.moveDown(2);
+    
+    // All Accounts
+    doc.fontSize(14).text('All Accounts:', { underline: true });
+    doc.moveDown();
+    doc.fontSize(10);
+    doc.text('Name'.padEnd(25) + 'Email'.padEnd(30) + 'Balance');
+    doc.text('-'.repeat(70));
+    accounts.forEach(acc => {
+      doc.text(`${acc.name}`.substring(0, 24).padEnd(25) + `${acc.email}`.substring(0, 29).padEnd(30) + `Rs. ${acc.balance || 0}`);
+    });
     doc.moveDown(2);
     
     // Transactions
-    doc.fontSize(14).text('Transactions Today:', { underline: true });
+    doc.fontSize(14).text('Today\'s Transactions:', { underline: true });
     doc.moveDown();
     
     if (transactions.length === 0) {
       doc.fontSize(12).text('No transactions today.');
     } else {
-      doc.fontSize(10);
-      doc.text('Date/Time'.padEnd(25) + 'Type'.padEnd(15) + 'Amount'.padEnd(15) + 'Details');
-      doc.text('-'.repeat(70));
+      doc.fontSize(9);
+      doc.text('Date/Time'.padEnd(20) + 'From'.padEnd(25) + 'To'.padEnd(25) + 'Amount');
+      doc.text('-'.repeat(90));
       
       let totalIn = 0, totalOut = 0;
       transactions.forEach(t => {
-        const isOut = t.from_email === account.email;
         const amount = parseFloat(t.amount);
-        if (isOut) totalOut += amount;
-        else totalIn += amount;
+        totalOut += amount; // just sum all as outgoing
         
-        const dir = isOut ? '→ SENT' : '← RECEIVED';
-        const line = `${t.created_at}`.substring(0, 19).padEnd(25) + 
-                     (t.type || 'transfer').padEnd(15) + 
-                     `${isOut ? '-' : '+'}Rs. ${t.amount}`.padEnd(15) + 
-                     dir;
+        const line = `${t.created_at}`.substring(0, 19).padEnd(20) + 
+                     `${t.from_email}`.substring(0, 24).padEnd(25) + 
+                     `${t.to_email}`.substring(0, 24).padEnd(25) + 
+                     `Rs. ${t.amount}`;
         doc.text(line);
-        if (!isOut) {
-          doc.text(`    From: ${t.from_email}`);
-        } else {
-          doc.text(`    To: ${t.to_email}`);
-        }
       });
       
       doc.moveDown();
-      doc.text('-'.repeat(70));
-      doc.text(`Total Received: Rs. ${totalIn}`);
-      doc.text(`Total Sent: Rs. ${totalOut}`);
+      doc.text('-'.repeat(90));
+      doc.fontSize(11);
+      doc.text(`Total Amount: Rs. ${totalOut}`);
     }
     
     doc.moveDown(2);
@@ -117,9 +121,9 @@ function generatePDF(account, transactions) {
   });
 }
 
-async function sendEmail(to, pdfBuffer, accountName) {
-  if (!config.resendApiKey) {
-    console.log(`No Resend key - skipping email to ${to}`);
+async function sendEmail(pdfBuffer) {
+  if (!config.resendApiKey || !config.reportEmail) {
+    console.log('No Resend key or report email - skipping');
     return;
   }
   
@@ -135,9 +139,9 @@ async function sendEmail(to, pdfBuffer, accountName) {
     },
   }, JSON.stringify({
     from: 'Mini Bank <onboarding@resend.dev>',
-    to: to,
+    to: config.reportEmail,
     subject: `Daily Report - ${new Date().toLocaleDateString()}`,
-    text: `Hi ${accountName}, attached is your daily transaction report from Mini Bank.`,
+    text: `Hi, attached is your daily transaction report from Mini Bank.`,
     attachments: [
       {
         filename: `report-${new Date().toISOString().split('T')[0]}.pdf`,
@@ -147,7 +151,7 @@ async function sendEmail(to, pdfBuffer, accountName) {
   }));
   
   if (res.status !== 200) {
-    console.log(`Email failed for ${to}:`, res.data);
+    console.log('Email failed:', res.data);
     throw new Error('Email failed');
   }
 }
@@ -161,16 +165,13 @@ async function main() {
   console.log('Generating reports...');
   try {
     const accounts = await getAllAccounts();
-    console.log(`Found ${accounts.length} accounts`);
+    const transactions = await getDailyTransactions();
     
-    for (const acc of accounts) {
-      const txns = await getDailyTransactions(acc.email);
-      console.log(`${acc.email}: ${txns.length} transactions`);
-      
-      const pdf = await generatePDF(acc, txns);
-      await sendEmail(acc.email, pdf, acc.name);
-      console.log(`Sent PDF to ${acc.email}`);
-    }
+    console.log(`Found ${accounts.length} accounts, ${transactions.length} transactions`);
+    
+    const pdf = await generatePDF(accounts, transactions);
+    await sendEmail(pdf);
+    console.log(`Sent PDF to ${config.reportEmail}`);
   } catch (e) {
     console.log('Error:', e.message);
   }
