@@ -2,6 +2,7 @@
  * Note App - Simple Note Keeping
  */
 
+
 const HTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
